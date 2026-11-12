@@ -115,6 +115,26 @@ describe("daemon", () => {
 		assert.equal(response.status, 400);
 	});
 
+	it("serves a worktree's images, and nothing else", async () => {
+		const png = Buffer.from(
+			"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==",
+			"base64",
+		);
+		writeFileSync(join(repo, "pixel.png"), png);
+		writeFileSync(join(root, "outside.png"), png);
+		const { projects } = await api("GET", "/api/projects");
+		const main = projects[0].workspaces.find((each: { main: boolean }) => each.main).id;
+		const file = (path: string) => fetch(`${daemon.url}/api/workspaces/${main}/file?path=${encodeURIComponent(path)}`);
+		const served = await file("pixel.png");
+		assert.equal(served.status, 200);
+		assert.equal(served.headers.get("content-type"), "image/png");
+		assert.deepEqual(Buffer.from(await served.arrayBuffer()), png);
+		assert.equal((await file(join(repo, "pixel.png"))).status, 200, "an absolute path inside the worktree");
+		assert.equal((await file("README.md")).status, 415);
+		assert.equal((await file("../outside.png")).status, 403);
+		assert.equal((await file("missing.png")).status, 404);
+	});
+
 	it("keeps the transcript across a restart and holds the data directory lock", async () => {
 		await assert.rejects(start(), /Another flowie daemon/);
 		await daemon.close();

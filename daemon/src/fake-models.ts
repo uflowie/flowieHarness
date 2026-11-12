@@ -1,6 +1,7 @@
 // A fake model for working on the UI without spending tokens (`FLOWIE_FAKE=1`). It streams thinking and Markdown, and
 // runs a real `bash` call when the message mentions "bash" or "tool", writes three pages for "long" or "lorem", and
-// for "slow" waits a second and streams unreadable thinking before answering.
+// for "slow" waits a second and streams unreadable thinking before answering, and for "image" or "picture" draws
+// one into the worktree and shows it.
 // Tools act on real files.
 import type { Message } from "@earendil-works/pi-ai";
 import { createModels, type MutableModels } from "@earendil-works/pi-ai/models";
@@ -40,7 +41,10 @@ export function createFakeModels(): MutableModels {
 }
 
 function reply(messages: readonly Message[]) {
-	const last = messages.at(-1);
+	// System prompt changes are placed among the messages; the fake answers the user or a tool.
+	const last = messages.findLast((message) => (message.role as string) !== "system");
+	if (last?.role === "toolResult" && last.toolCallId === SAMPLE_IMAGE_CALL && !last.isError)
+		return fauxAssistantMessage(`Here it is:\n\n![A sample image](${SAMPLE_IMAGE})`);
 	if (last?.role === "toolResult") {
 		const output = last.content.map((part) => (part.type === "text" ? part.text : "[image]")).join("\n");
 		return fauxAssistantMessage([
@@ -51,6 +55,14 @@ function reply(messages: readonly Message[]) {
 	const text = userText(last);
 	if (/\b(long|lorem)\b/i.test(text))
 		return fauxAssistantMessage([fauxThinking("A long answer, to exercise streaming and scrolling."), fauxText(LONG)]);
+	if (/\b(image|picture)\b/i.test(text))
+		return fauxAssistantMessage(
+			[
+				fauxText("I'll draw one in the worktree."),
+				fauxToolCall("bash", { command: SAMPLE_IMAGE_COMMAND }, { id: SAMPLE_IMAGE_CALL }),
+			],
+			{ stopReason: "toolUse" },
+		);
 	if (/\b(bash|tool)\b/i.test(text))
 		return fauxAssistantMessage(
 			[
@@ -80,3 +92,9 @@ const LONG = Array.from(
 	(_, index) =>
 		`Paragraph ${index + 1}. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.`,
 ).join("\n\n");
+
+/** "image" or "picture": a real bash call writes a small PNG into the worktree, then the answer shows it in Markdown. */
+const SAMPLE_IMAGE = "flowie-sample.png";
+const SAMPLE_IMAGE_CALL = "fake-sample-image";
+// A 64 x 64 blue square, written by Node so it works in any shell.
+const SAMPLE_IMAGE_COMMAND = `node -e "require('fs').writeFileSync('${SAMPLE_IMAGE}', Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAIAAAAlC+aJAAAAeUlEQVR4nO3PwQkAIBDAsNvL7Rzat0P4CEKhA6Sz9vm64YIGtKABLWhACxrQgga0oAEtaEALGtCCBrSgAS1oQAsa0IIGtKABLWhACxrQgga0oAEtaEALGtCCBrSgAS1oQAsa0IIGtKABLWhACxrQgga0oAEtaEALHrvwQDGWF3tzjQAAAABJRU5ErkJggg==', 'base64'))"`;

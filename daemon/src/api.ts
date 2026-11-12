@@ -17,6 +17,7 @@ import type { Access } from "./access.ts";
 import { GitError } from "./git.ts";
 import type { AgentDefaults } from "./models.ts";
 import { listDirectory } from "./directories.ts";
+import { FileResponse, sendFile, worktreeImage } from "./workspace-files.ts";
 import type { Projects, Workspace } from "./projects.ts";
 import {
 	AddProject,
@@ -82,7 +83,8 @@ async function handle(
 		if (route === undefined) throw new HttpError(404, "Not found");
 		const params = (route.pattern.exec(url.pathname) ?? []).slice(1).map(decodeURIComponent);
 		const result = await route.handle({ url, params, body: (validator) => readBody(request, validator) });
-		send(response, 200, result ?? { ok: true });
+		if (result instanceof FileResponse) sendFile(response, result);
+		else send(response, 200, result ?? { ok: true });
 	} catch (error) {
 		const status = statusOf(error);
 		if (status === 500) console.error("flowie: request failed:", error);
@@ -258,6 +260,18 @@ function apiRoutes({ projects, hosts, models, defaults }: ApiDeps): Route[] {
 				const { handoff } = await request.body(Reset);
 				const { root } = await openWorkspace(request.params[0]!);
 				await root.reset(handoff, BACKGROUND_CONTEXT);
+			},
+		},
+		{
+			// An image of the worktree, for Markdown images the agent writes with a file path.
+			method: "GET",
+			pattern: /^\/api\/workspaces\/([^/]+)\/file$/,
+			handle: async ({ url, params: [id] }) => {
+				const path = url.searchParams.get("path");
+				if (!path) throw new HttpError(400, "A path is required");
+				const image = await worktreeImage((await workspaceOf(id!)).path, path);
+				if (!(image instanceof FileResponse)) throw new HttpError(image.status, image.message);
+				return image;
 			},
 		},
 		{

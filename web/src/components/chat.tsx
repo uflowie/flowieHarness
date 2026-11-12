@@ -31,6 +31,7 @@ import { Trace, TraceIcon, TraceLine, TraceTitle } from "@/components/ui/trace";
 import type { ConversationState } from "@/hooks/use-conversation";
 import { type Pending, useOutbox } from "@/hooks/use-outbox";
 import { api } from "@/lib/api";
+import { CurrentWorkspace } from "@/lib/workspace-images";
 
 type Props = { readonly workspace: string; readonly conversation: ConversationState };
 
@@ -50,47 +51,49 @@ export function Chat({ workspace, conversation }: Props) {
 		!view.items.some((item) => item.kind === "entry");
 
 	return (
-		<MessageScrollerProvider autoScroll>
-			<div className="flex min-h-0 flex-1 flex-col">
-				<div className="min-h-0 flex-1">
-					{view === undefined ? (
-						<Empty className="h-full">
-							<Spinner />
-						</Empty>
-					) : empty ? (
-						<Empty className="h-full">
-							<EmptyHeader>
-								<EmptyMedia variant="icon">
-									<MessageCircleDashedIcon />
-								</EmptyMedia>
-								<EmptyTitle>What should we build?</EmptyTitle>
-								<EmptyDescription>The agent works in this worktree: it reads code, runs commands and edits files.</EmptyDescription>
-							</EmptyHeader>
-						</Empty>
-					) : (
-						<MessageScroller>
-							<MessageScrollerViewport>
-								<MessageScrollerContent aria-busy={busy} className="mx-auto w-full max-w-3xl gap-6 px-6 py-6">
-									<Transcript workspace={workspace} view={view} conversation={conversation} pending={outbox.pending} />
-								</MessageScrollerContent>
-							</MessageScrollerViewport>
-							<MessageScrollerButton />
-						</MessageScroller>
-					)}
+		<CurrentWorkspace.Provider value={workspace}>
+			<MessageScrollerProvider autoScroll>
+				<div className="flex min-h-0 flex-1 flex-col">
+					<div className="min-h-0 flex-1">
+						{view === undefined ? (
+							<Empty className="h-full">
+								<Spinner />
+							</Empty>
+						) : empty ? (
+							<Empty className="h-full">
+								<EmptyHeader>
+									<EmptyMedia variant="icon">
+										<MessageCircleDashedIcon />
+									</EmptyMedia>
+									<EmptyTitle>What should we build?</EmptyTitle>
+									<EmptyDescription>The agent works in this worktree: it reads code, runs commands and edits files.</EmptyDescription>
+								</EmptyHeader>
+							</Empty>
+						) : (
+							<MessageScroller>
+								<MessageScrollerViewport>
+									<MessageScrollerContent aria-busy={busy} className="mx-auto w-full max-w-3xl gap-6 px-6 py-6">
+										<Transcript workspace={workspace} view={view} conversation={conversation} pending={outbox.pending} />
+									</MessageScrollerContent>
+								</MessageScrollerViewport>
+								<MessageScrollerButton />
+							</MessageScroller>
+						)}
+					</div>
+					<div className="mx-auto flex w-full max-w-3xl flex-col gap-2 px-6 pb-6">
+						{problem && (
+							<Marker className="text-destructive">
+								<MarkerIcon>
+									<AlertCircleIcon />
+								</MarkerIcon>
+								<MarkerContent>{problem}</MarkerContent>
+							</Marker>
+						)}
+						<PromptInput workspace={workspace} busy={busy} view={view} send={outbox.send} />
+					</div>
 				</div>
-				<div className="mx-auto flex w-full max-w-3xl flex-col gap-2 px-6 pb-6">
-					{problem && (
-						<Marker className="text-destructive">
-							<MarkerIcon>
-								<AlertCircleIcon />
-							</MarkerIcon>
-							<MarkerContent>{problem}</MarkerContent>
-						</Marker>
-					)}
-					<PromptInput workspace={workspace} busy={busy} view={view} send={outbox.send} />
-				</div>
-			</div>
-		</MessageScrollerProvider>
+			</MessageScrollerProvider>
+		</CurrentWorkspace.Provider>
 	);
 }
 

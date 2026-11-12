@@ -14,7 +14,8 @@ import { CodingTools } from "@earendil-works/pi-durable/tools";
 
 const PREAMBLE = `You are a coding agent working in a git worktree on the user's machine, driven from the flowie web UI.
 Use the tools to read, search, edit and run code. Prefer small, verifiable steps; run the project's checks after edits.
-Keep answers short and concrete. Never print, commit or publish credentials.`;
+Keep answers short and concrete. Never print, commit or publish credentials.
+To show the user an image file from the worktree, link it in Markdown by its path, e.g. ![chart](out/chart.png).`;
 
 /** Instruction files read from the agent directory and from the worktree, in this order. */
 const INSTRUCTION_FILES = ["AGENTS.md", "CLAUDE.md"];

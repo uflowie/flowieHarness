@@ -51,6 +51,7 @@ JSON in and out; errors are `{ "error": "..." }` with 400 (invalid input, git re
 | `POST /api/workspaces/:id/abort` | | Stop the running work, withdraw queued input |
 | `POST /api/workspaces/:id/compact` | `{ instructions? }` | Summarize older context |
 | `POST /api/workspaces/:id/reset` | `{ handoff? }` | Start a fresh context (history stays) |
+| `GET /api/workspaces/:id/file?path=` | | An image file of the worktree (path relative to it, or absolute inside it), for Markdown images the agent writes |
 | `GET /api/workspaces/:id/entries?min=&max=&order=&limit=&cursor=&conversation=` | | History between entry IDs `min` and `max` (inclusive), newest first unless `order=ascending` |
 
 ## WebSocket `/api/ws`

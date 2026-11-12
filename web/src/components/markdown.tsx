@@ -1,7 +1,7 @@
 // Model text as Markdown with Streamdown (it copes with half-written Markdown while an answer streams), fenced code
 // routed to a highlighted Code Block, as in shadcn's Code Block "Markdown" example.
-import { memo } from "react";
-import { type ExtraProps, Streamdown, useIsCodeFenceIncomplete } from "streamdown";
+import { memo, useContext, useMemo } from "react";
+import { defaultRehypePlugins, type ExtraProps, Streamdown, useIsCodeFenceIncomplete } from "streamdown";
 import {
 	CodeBlock,
 	CodeBlockActions,
@@ -12,10 +12,24 @@ import {
 	CodeBlockTitle,
 } from "@/components/ui/code-block";
 import { useHighlightedCode } from "@/hooks/use-highlighted-code";
+import { CurrentWorkspace, workspaceImages } from "@/lib/workspace-images";
 
 export const Markdown = memo(function Markdown({ text, streaming }: { text: string; streaming?: boolean }) {
+	const workspace = useContext(CurrentWorkspace);
+	// Streamdown's own plugins, with worktree images pointed at the daemon before its link check (harden) runs.
+	const rehypePlugins = useMemo(() => {
+		const { harden, ...rest } = defaultRehypePlugins;
+		return workspace === undefined
+			? Object.values(defaultRehypePlugins)
+			: [...Object.values(rest), workspaceImages(workspace), ...(harden ? [harden] : [])];
+	}, [workspace]);
 	return (
-		<Streamdown controls={false} components={components} isAnimating={streaming === true}>
+		<Streamdown
+			controls={false}
+			components={components}
+			rehypePlugins={rehypePlugins}
+			isAnimating={streaming === true}
+		>
 			{text}
 		</Streamdown>
 	);
