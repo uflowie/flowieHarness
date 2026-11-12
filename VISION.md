@@ -6,6 +6,7 @@
 - why not T3, Paseo, (...)? there are many pi-compatible UIs but this one is mine
 
 # features
+- local only! i spend enough time on my phone as is
 - project based side-bar. one project is a git repo. one repo can spawn worktrees based off of its current main
 - image input/output
 - human review with a structural diff viewer
