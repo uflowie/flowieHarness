@@ -1,0 +1,16 @@
+{
+	"name": "flowie-harness",
+	"private": true,
+	"type": "module",
+	"workspaces": [
+		"daemon",
+		"web"
+	],
+	"scripts": {
+		"dev": "node scripts/dev.mjs",
+		"daemon": "npm run start -w daemon",
+		"build": "npm run build -w web",
+		"check": "npm run check -w daemon && npm run check -w web",
+		"test": "npm test -w daemon"
+	}
+}
