@@ -3,7 +3,7 @@
 // lock, and removing a worktree.
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { request } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -133,6 +133,15 @@ describe("daemon", () => {
 		assert.equal((await file("README.md")).status, 415);
 		assert.equal((await file("../outside.png")).status, 403);
 		assert.equal((await file("missing.png")).status, 404);
+	});
+
+	it("reads and writes the global instructions in the agent directory", async () => {
+		const path = join(agentDir, "AGENTS.md");
+		assert.deepEqual(await api("GET", "/api/instructions"), { path, exists: false, content: "" });
+		await api("PUT", "/api/instructions", { content: "Use tabs.\n" });
+		assert.equal(readFileSync(path, "utf8"), "Use tabs.\n");
+		assert.deepEqual(await api("GET", "/api/instructions"), { path, exists: true, content: "Use tabs.\n" });
+		rmSync(path);
 	});
 
 	it("keeps the transcript across a restart and holds the data directory lock", async () => {

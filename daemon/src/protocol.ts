@@ -71,6 +71,17 @@ export type WorkspaceDetail = WorkspaceListing & {
 	readonly usage: UsageState;
 };
 
+/** `GET /api/instructions`, `PUT /api/instructions`: the global instruction file every agent's prompt includes. */
+export type GlobalInstructions = {
+	readonly path: string;
+	/** False until the first save creates it. */
+	readonly exists: boolean;
+	readonly content: string;
+};
+
+/** `PUT /api/instructions`. */
+export const SaveInstructions = compile(obj({ content: str() }));
+
 const Text = obj({ type: lit("text"), text: str() });
 const Image = obj({ type: lit("image"), data: str({ minLength: 1 }), mimeType: str({ minLength: 1 }) });
 

@@ -17,6 +17,7 @@ import type { Access } from "./access.ts";
 import { GitError } from "./git.ts";
 import type { AgentDefaults } from "./models.ts";
 import { listDirectory } from "./directories.ts";
+import { readGlobalInstructions, writeGlobalInstructions } from "./global-instructions.ts";
 import { FileResponse, sendFile, worktreeImage } from "./workspace-files.ts";
 import type { Projects, Workspace } from "./projects.ts";
 import {
@@ -26,8 +27,10 @@ import {
 	CreateWorktree,
 	type DirectoryListing,
 	type ModelListing,
+	type GlobalInstructions,
 	type ProjectListing,
 	Reset,
+	SaveInstructions,
 	Submit,
 	type WorkspaceDetail,
 	type WorkspaceListing,
@@ -40,6 +43,8 @@ export type ApiDeps = {
 	readonly hosts: WorkspaceHosts;
 	readonly models: () => Models;
 	readonly defaults: () => AgentDefaults;
+	/** pi's agent directory, holding the global instruction file. */
+	readonly agentDir: string;
 };
 
 /** A refusal with its HTTP status. */
@@ -92,7 +97,7 @@ async function handle(
 	}
 }
 
-function apiRoutes({ projects, hosts, models, defaults }: ApiDeps): Route[] {
+function apiRoutes({ projects, hosts, models, defaults, agentDir }: ApiDeps): Route[] {
 	const workspaceOf = async (id: string): Promise<Workspace> => {
 		const workspace = await projects.workspace(id);
 		if (workspace === undefined) throw new HttpError(404, "Unknown workspace");
@@ -166,6 +171,17 @@ function apiRoutes({ projects, hosts, models, defaults }: ApiDeps): Route[] {
 					url.searchParams.get("path") ?? undefined,
 					projects.list().map((project) => dirname(project.path)),
 				),
+		},
+		{
+			method: "GET",
+			pattern: /^\/api\/instructions$/,
+			handle: async (): Promise<GlobalInstructions> => readGlobalInstructions(agentDir),
+		},
+		{
+			method: "PUT",
+			pattern: /^\/api\/instructions$/,
+			handle: async (request): Promise<GlobalInstructions> =>
+				writeGlobalInstructions(agentDir, (await request.body(SaveInstructions)).content),
 		},
 		{
 			method: "GET",

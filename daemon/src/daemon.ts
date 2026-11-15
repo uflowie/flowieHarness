@@ -57,7 +57,7 @@ export async function startDaemon(options: DaemonOptions = {}): Promise<Daemon> 
 		});
 		let port = options.port ?? 0;
 		const access = loopbackAccess(() => port, options.allowedOrigins ?? []);
-		const api = createApi({ access, projects, hosts, models: () => models, defaults });
+		const api = createApi({ access, projects, hosts, models: () => models, defaults, agentDir });
 		const web = serveStatic(options.webDir ?? WEB_DIR, access);
 		const server = createServer((request, response) =>
 			(request.url ?? "/").startsWith("/api/") ? api(request, response) : web(request, response),

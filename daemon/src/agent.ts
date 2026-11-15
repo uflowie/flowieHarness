@@ -34,7 +34,7 @@ const RULES = `- Use bash for file operations like ls, rg, find
 - Show file paths clearly when working with files`;
 
 /** pi's context file names; the first one present in a directory is the one read. */
-const INSTRUCTION_FILES = ["AGENTS.override.md", "AGENTS.md", "AGENTS.MD", "CLAUDE.md", "CLAUDE.MD"];
+export const INSTRUCTION_FILES = ["AGENTS.override.md", "AGENTS.md", "AGENTS.MD", "CLAUDE.md", "CLAUDE.MD"];
 
 /** The registry every workspace's Harness reads: the coding tools and flowie's prompt. */
 export function createAgentRegistry(agentDir: string) {

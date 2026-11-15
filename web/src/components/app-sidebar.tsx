@@ -1,9 +1,18 @@
 // The project sidebar: each registered repository with its worktrees and their agents' status.
 import type { ProjectListing, WorkspaceListing, WorkspaceStatus } from "@flowie/daemon/protocol";
-import { EllipsisIcon, FolderPlusIcon, GitBranchPlusIcon, PlusIcon, TrashIcon, XIcon } from "lucide-react";
+import {
+	EllipsisIcon,
+	FileTextIcon,
+	FolderPlusIcon,
+	GitBranchPlusIcon,
+	PlusIcon,
+	TrashIcon,
+	XIcon,
+} from "lucide-react";
 import { type FormEvent, useState } from "react";
 import { toast } from "sonner";
 import { useConfirm } from "@/components/confirm";
+import { InstructionsDialog } from "@/components/instructions-dialog";
 import { RepoDialog } from "@/components/repo-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -54,6 +63,7 @@ type Props = {
 
 export function AppSidebar({ projects, statuses, connected, selected, select, refresh }: Props) {
 	const [adding, setAdding] = useState(false);
+	const [editingInstructions, setEditingInstructions] = useState(false);
 
 	return (
 		<Sidebar>
@@ -69,7 +79,23 @@ export function AppSidebar({ projects, statuses, connected, selected, select, re
 					<Tooltip>
 						<TooltipTrigger
 							render={
-								<Button variant="ghost" size="icon-sm" className="ml-auto" aria-label="Add a repository" onClick={() => setAdding(true)} />
+								<Button
+									variant="ghost"
+									size="icon-sm"
+									className="ml-auto"
+									aria-label="Global instructions"
+									onClick={() => setEditingInstructions(true)}
+								/>
+							}
+						>
+							<FileTextIcon />
+						</TooltipTrigger>
+						<TooltipContent>Global instructions</TooltipContent>
+					</Tooltip>
+					<Tooltip>
+						<TooltipTrigger
+							render={
+								<Button variant="ghost" size="icon-sm" aria-label="Add a repository" onClick={() => setAdding(true)} />
 							}
 						>
 							<PlusIcon />
@@ -104,6 +130,7 @@ export function AppSidebar({ projects, statuses, connected, selected, select, re
 					/>
 				))}
 			</SidebarContent>
+			<InstructionsDialog open={editingInstructions} onOpenChange={setEditingInstructions} />
 			<RepoDialog
 				open={adding}
 				onOpenChange={setAdding}

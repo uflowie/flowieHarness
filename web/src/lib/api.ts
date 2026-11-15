@@ -3,6 +3,7 @@ import type { ModelThinkingLevel } from "@earendil-works/pi-ai";
 import type { EntryRecord, ModelRef } from "@earendil-works/pi-durable";
 import type {
 	DirectoryListing,
+	GlobalInstructions,
 	ModelListing,
 	ProjectListing,
 	Submit,
@@ -48,6 +49,8 @@ export const api = {
 	directories: (path: string | undefined) =>
 		call<DirectoryListing>("GET", `/api/directories${path === undefined ? "" : `?path=${encodeURIComponent(path)}`}`),
 	models: () => call<ModelListing>("GET", "/api/models"),
+	instructions: () => call<GlobalInstructions>("GET", "/api/instructions"),
+	saveInstructions: (content: string) => call<GlobalInstructions>("PUT", "/api/instructions", { content }),
 	configure: (id: string, change: { model?: ModelRef | null; thinkingLevel?: ModelThinkingLevel | null }) =>
 		call<unknown>("POST", workspacePath(id, "/agent"), change),
 	submit: (id: string, input: Submit) => call<{ submission: number }>("POST", workspacePath(id, "/submit"), input),
