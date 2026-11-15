@@ -1,4 +1,11 @@
-// The app shell: the project sidebar and the selected workspace, chosen by the URL hash (`#/w/<id>`).
+// The app shell: the project sidebar and the selected workspace, chosen by the URL hash (`#/w/<id>`). Recently shown
+// workspaces stay mounted and live, hidden with `visibility: hidden`, so switching back to one is instant and keeps its
+// scroll position and drafts.
+//
+// Not `<Activity mode="hidden">`: hiding detaches refs and showing reattaches them children first, so the message
+// scroller measures its transcript before it has its viewport, takes that for "at the bottom" and jumps to the end.
+// `display: none` would make it measure a zero-size viewport, with the same result. Hidden by visibility, a workspace
+// keeps its layout and nothing re-measures.
 import type { ProjectListing } from "@flowie/daemon/protocol";
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { AppSidebar } from "@/components/app-sidebar";
@@ -37,9 +44,11 @@ export function App() {
 		if (connected) void refresh();
 	}, [connected, refresh]);
 
-	const found = projects
-		?.flatMap((project) => project.workspaces.map((workspace) => ({ project, workspace })))
-		.find((each) => each.workspace.id === selected);
+	const kept = useKeptWorkspaces(selected);
+	const listed = new Map(
+		projects?.flatMap((project) => project.workspaces.map((workspace) => [workspace.id, { project, workspace }])),
+	);
+	const found = selected === undefined ? undefined : listed.get(selected);
 
 	return (
 		<SidebarProvider>
@@ -53,15 +62,26 @@ export function App() {
 				}}
 				refresh={refresh}
 			/>
-			<SidebarInset className="h-svh min-h-0 overflow-hidden">
-				{found ? (
-					<Workspace
-						key={found.workspace.id}
-						workspace={found.workspace}
-						projectName={found.project.name}
-						status={statuses[found.workspace.id] ?? found.workspace.status}
-					/>
-				) : (
+			{/* Every kept workspace in the same grid cell; only the selected one is visible. */}
+			<SidebarInset className="grid h-svh min-h-0 overflow-hidden *:col-start-1 *:row-start-1 *:min-h-0 *:min-w-0">
+				{kept.map((id) => {
+					const each = listed.get(id);
+					const active = id === selected;
+					return (
+						each && (
+							// Transitions off while hidden: an inherited `visibility` change transitions too, so anything with
+							// `transition-all` (buttons) would stay visible over the next workspace for its duration.
+							<div key={id} className={active ? undefined : "invisible **:transition-none"} inert={!active}>
+								<Workspace
+									workspace={each.workspace}
+									projectName={each.project.name}
+									status={statuses[id] ?? each.workspace.status}
+								/>
+							</div>
+						)
+					);
+				})}
+				{!found && (
 					<Empty className="h-full">
 						<EmptyHeader>
 							<EmptyTitle>{error ? "The daemon is unreachable" : "Select a worktree"}</EmptyTitle>
@@ -72,6 +92,27 @@ export function App() {
 			</SidebarInset>
 		</SidebarProvider>
 	);
+}
+
+/** How many workspaces stay mounted (hidden) after being shown. Each keeps its watch, so the daemon keeps it open. */
+const KEEP_MOUNTED = 5;
+
+type Kept = { readonly selected: string | undefined; readonly ids: readonly string[]; readonly recent: readonly string[] };
+
+/**
+ * The workspaces to keep mounted: the selected one and the most recently selected others, up to KEEP_MOUNTED, in the
+ * order they were first shown. The order never changes, since moving a mounted workspace in the DOM loses its scroll
+ * position. Updated during render, so a newly selected workspace mounts in the same render that selects it.
+ */
+function useKeptWorkspaces(selected: string | undefined): readonly string[] {
+	const [kept, setKept] = useState<Kept>({ selected: undefined, ids: [], recent: [] });
+	if (kept.selected === selected) return kept.ids;
+	const recent =
+		selected === undefined ? kept.recent : [selected, ...kept.recent.filter((id) => id !== selected)].slice(0, KEEP_MOUNTED);
+	const ids = kept.ids.filter((id) => recent.includes(id));
+	if (selected !== undefined && !ids.includes(selected)) ids.push(selected);
+	setKept({ selected, ids, recent });
+	return ids;
 }
 
 function useHashWorkspace(): string | undefined {
