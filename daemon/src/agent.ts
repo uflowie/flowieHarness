@@ -1,5 +1,5 @@
 // What a workspace's agent runs with: pi-durable's coding tools and pi's coding-agent system prompt, minus the
-// sections about pi itself (its docs, skills, PI_* variables) that do not apply to flowie.
+// sections about pi itself (its docs, PI_* variables) that do not apply to flowie.
 import { join } from "node:path";
 import type { Context } from "@earendil-works/chord/context";
 import {
@@ -11,6 +11,7 @@ import {
 } from "@earendil-works/pi-durable";
 import type { ExecutionEnv } from "@earendil-works/pi-durable/env";
 import { CodingTools } from "@earendil-works/pi-durable/tools";
+import { formatSkillsForPrompt, loadSkills } from "./skills.ts";
 
 // The text below follows pi/packages/coding-agent/src/core/system-prompt.ts with the default tools (read, bash,
 // edit, write) and each tool's snippet and guidelines from coding-agent/src/core/tools/*.ts.
@@ -46,7 +47,7 @@ export function createAgentRegistry(agentDir: string) {
 
 /**
  * The system prompt sections. Sections render before every request, but Durable only resends what changed, so the
- * instruction files are read each time and an edit reaches the next request without a restart.
+ * instruction files and skills are read each time and an edit reaches the next request without a restart.
  */
 function flowiePrompt(agentDir: string) {
 	return defineExtension({
@@ -59,7 +60,10 @@ function flowiePrompt(agentDir: string) {
 			section("project_context", (input, context) =>
 				input.env === undefined ? undefined : projectContext(input.env, [agentDir, input.env.cwd], context),
 			),
-			section("cwd", (input) => input.env?.cwd.replace(/\\/g, "/")),
+			section("skills", async (input) =>
+				input.env === undefined ? undefined : formatSkillsForPrompt(await loadSkills(agentDir, input.env.cwd)),
+			),
+			section("cwd",(input) => input.env?.cwd.replace(/\\/g, "/")),
 		],
 	});
 }
