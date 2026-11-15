@@ -1,4 +1,5 @@
-// What a workspace's agent runs with: pi-durable's coding tools and flowie's system prompt.
+// What a workspace's agent runs with: pi-durable's coding tools and pi's coding-agent system prompt, minus the
+// sections about pi itself (its docs, skills, PI_* variables) that do not apply to flowie.
 import { join } from "node:path";
 import type { Context } from "@earendil-works/chord/context";
 import {
@@ -6,19 +7,34 @@ import {
 	defineExtension,
 	GenerationTask,
 	hook,
-	type PromptInput,
 	section,
 } from "@earendil-works/pi-durable";
 import type { ExecutionEnv } from "@earendil-works/pi-durable/env";
 import { CodingTools } from "@earendil-works/pi-durable/tools";
 
-const PREAMBLE = `You are a coding agent working in a git worktree on the user's machine, driven from the flowie web UI.
-Use the tools to read, search, edit and run code. Prefer small, verifiable steps; run the project's checks after edits.
-Keep answers short and concrete. Never print, commit or publish credentials.
-To show the user an image file from the worktree, link it in Markdown by its path, e.g. ![chart](out/chart.png).`;
+// The text below follows pi/packages/coding-agent/src/core/system-prompt.ts with the default tools (read, bash,
+// edit, write) and each tool's snippet and guidelines from coding-agent/src/core/tools/*.ts.
+const PREAMBLE =
+	"You are a coding assistant running inside flowie, a coding agent harness. Help users inspect files, run commands, and modify code.";
 
-/** Instruction files read from the agent directory and from the worktree, in this order. */
-const INSTRUCTION_FILES = ["AGENTS.md", "CLAUDE.md"];
+const TOOLS = `- read: Read file contents
+- bash: Execute bash commands (ls, grep, find, etc.)
+- edit: Make precise file edits with exact text replacement, including multiple disjoint edits in one call
+- write: Create or overwrite files
+
+Additional tools may be available.`;
+
+const RULES = `- Use bash for file operations like ls, rg, find
+- Use read to examine files instead of cat or sed.
+- Use edit for targeted changes. Batch changes to one file in a single call.
+- Each edits[].oldText must exactly and uniquely match the original file. Keep matches short and non-overlapping; merge nearby changes without including large unchanged regions.
+- Use write only for new files or complete rewrites.
+- To show the user an image file from the worktree, link it in Markdown by its path, e.g. ![chart](out/chart.png).
+- Be concise in your responses
+- Show file paths clearly when working with files`;
+
+/** pi's context file names; the first one present in a directory is the one read. */
+const INSTRUCTION_FILES = ["AGENTS.override.md", "AGENTS.md", "AGENTS.MD", "CLAUDE.md", "CLAUDE.MD"];
 
 /** The registry every workspace's Harness reads: the coding tools and flowie's prompt. */
 export function createAgentRegistry(agentDir: string) {
@@ -38,11 +54,12 @@ function flowiePrompt(agentDir: string) {
 		hooks: [hook(GenerationTask, { beforeProviderRequest: (request) => detailedReasoningSummaries(request) })],
 		sections: [
 			section("preamble", () => PREAMBLE, { tag: false }),
-			section("environment", (input) => environment(input)),
-			section("user_instructions", (input, context) => instructions(input.env, [agentDir], context)),
-			section("project_instructions", (input, context) =>
-				input.env === undefined ? undefined : instructions(input.env, [input.env.cwd], context),
+			section("tools", () => TOOLS),
+			section("rules", () => RULES),
+			section("project_context", (input, context) =>
+				input.env === undefined ? undefined : projectContext(input.env, [agentDir, input.env.cwd], context),
 			),
+			section("cwd", (input) => input.env?.cwd.replace(/\\/g, "/")),
 		],
 	});
 }
@@ -65,24 +82,20 @@ export function detailedReasoningSummaries(request: {
 	return { payload: { ...payload, reasoning: { ...payload.reasoning, summary: "detailed" } } };
 }
 
-function environment(input: PromptInput): string | undefined {
-	if (input.env === undefined) return undefined;
-	return `Working directory: ${input.env.cwd}\nPlatform: ${process.platform}`;
-}
-
-/** The instruction files found in `directories`, each under its path; undefined when there are none. */
-async function instructions(
-	env: ExecutionEnv | undefined,
+/** The first instruction file of each directory, rendered as pi renders project context; undefined when there are none. */
+async function projectContext(
+	env: ExecutionEnv,
 	directories: readonly string[],
 	context: Context,
 ): Promise<string | undefined> {
-	if (env === undefined) return undefined;
 	const found: string[] = [];
 	for (const directory of directories)
 		for (const name of INSTRUCTION_FILES) {
 			const path = join(directory, name);
 			const read = await env.readTextFile(path, context);
-			if (read.ok && read.value.trim()) found.push(`# ${path}\n\n${read.value.trim()}`);
+			if (!read.ok) continue;
+			found.push(`<project_instructions path="${path}">\n${read.value}\n</project_instructions>`);
+			break;
 		}
-	return found.length ? found.join("\n\n") : undefined;
+	return found.length ? ["Project-specific instructions and guidelines:", ...found].join("\n\n") : undefined;
 }
