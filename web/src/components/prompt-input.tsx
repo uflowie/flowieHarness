@@ -312,7 +312,7 @@ function ModelSelector({ workspace, view }: { workspace: string; view: Transcrip
 								onValueChange={(value: string) => void configure({ thinkingLevel: value as ModelThinkingLevel })}
 							>
 								{THINKING.map((level) => (
-									<DropdownMenuRadioItem key={level} value={level}>
+									<DropdownMenuRadioItem key={level} value={level} closeOnClick>
 										{level}
 									</DropdownMenuRadioItem>
 								))}
