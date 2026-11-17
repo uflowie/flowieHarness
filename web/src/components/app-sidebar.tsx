@@ -1,6 +1,7 @@
 // The project sidebar: each registered repository with its worktrees and their agents' status.
 import type { ProjectListing, WorkspaceListing, WorkspaceStatus } from "@flowie/daemon/protocol";
 import {
+	ChevronRightIcon,
 	EllipsisIcon,
 	FileTextIcon,
 	FolderPlusIcon,
@@ -14,6 +15,7 @@ import { toast } from "sonner";
 import { useConfirm } from "@/components/confirm";
 import { InstructionsDialog } from "@/components/instructions-dialog";
 import { RepoDialog } from "@/components/repo-dialog";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -160,7 +162,12 @@ function Project({
 	refresh(): Promise<void>;
 }) {
 	const [creating, setCreating] = useState(false);
+	const [open, setOpen] = useState(() => !readCollapsed(project.id));
 	const confirm = useConfirm();
+	const toggle = (next: boolean) => {
+		setOpen(next);
+		writeCollapsed(project.id, !next);
+	};
 
 	const removeProject = async () => {
 		const confirmed = await confirm({
@@ -207,8 +214,15 @@ function Project({
 	};
 
 	return (
-		<SidebarGroup>
-			<SidebarGroupLabel title={project.path}>{project.name}</SidebarGroupLabel>
+		<Collapsible open={open} onOpenChange={toggle} render={<SidebarGroup />}>
+			<SidebarGroupLabel
+				title={project.path}
+				render={<CollapsibleTrigger />}
+				className="w-full pr-8 text-left hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+			>
+				<ChevronRightIcon className="-ml-0.5 mr-1 transition-transform [[data-panel-open]>&]:rotate-90" />
+				<span className="truncate">{project.name}</span>
+			</SidebarGroupLabel>
 			<DropdownMenu>
 				<DropdownMenuTrigger render={<SidebarGroupAction aria-label={`${project.name} actions`} />}>
 					<EllipsisIcon />
@@ -225,7 +239,7 @@ function Project({
 					</DropdownMenuItem>
 				</DropdownMenuContent>
 			</DropdownMenu>
-			<SidebarGroupContent>
+			<CollapsibleContent render={<SidebarGroupContent />}>
 				{project.error && <p className="px-2 text-xs text-destructive">{project.error}</p>}
 				<SidebarMenu>
 					{project.workspaces.map((workspace) => {
@@ -251,7 +265,7 @@ function Project({
 						);
 					})}
 				</SidebarMenu>
-			</SidebarGroupContent>
+			</CollapsibleContent>
 			<NewWorktreeDialog
 				project={project}
 				open={creating}
@@ -262,7 +276,7 @@ function Project({
 					select(workspace.id);
 				}}
 			/>
-		</SidebarGroup>
+		</Collapsible>
 	);
 }
 
@@ -333,6 +347,25 @@ function StatusDot({ status }: { status: WorkspaceStatus }) {
 					? "bg-success"
 					: "border border-muted-foreground";
 	return <span className={cn("size-2 shrink-0 rounded-full", tone)} />;
+}
+
+const collapsedKey = (project: string) => `flowie.collapsed.${project}`;
+
+function readCollapsed(project: string): boolean {
+	try {
+		return localStorage.getItem(collapsedKey(project)) === "1";
+	} catch {
+		return false;
+	}
+}
+
+function writeCollapsed(project: string, collapsed: boolean): void {
+	try {
+		if (collapsed) localStorage.setItem(collapsedKey(project), "1");
+		else localStorage.removeItem(collapsedKey(project));
+	} catch {
+		// A convenience only.
+	}
 }
 
 function fail(error: unknown): void {
