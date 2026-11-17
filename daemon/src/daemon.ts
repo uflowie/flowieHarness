@@ -3,6 +3,7 @@ import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { fileURLToPath } from "node:url";
 import type { Models } from "@earendil-works/pi-ai/models";
+import { CodemodeSandbox } from "@earendil-works/pi-codemode";
 import { loopbackAccess } from "./access.ts";
 import { createAgentRegistry } from "./agent.ts";
 import { createApi } from "./api.ts";
@@ -32,7 +33,10 @@ export type DaemonOptions = {
 	readonly webDir?: string;
 };
 
-const WEB_DIR = fileURLToPath(new URL("../../web/dist", import.meta.url));
+/** VM memory per code mode script, as pi's coding agent allows. */
+const CODEMODE_MEMORY_LIMIT_BYTES = 256 * 1024 * 1024;
+
+const WEB_DIR =fileURLToPath(new URL("../../web/dist", import.meta.url));
 
 export type Daemon = {
 	readonly port: number;
@@ -48,10 +52,12 @@ export async function startDaemon(options: DaemonOptions = {}): Promise<Daemon> 
 		const models = options.models ?? createModels(agentDir);
 		const defaults = () => options.defaults ?? knownAgentDefaults(agentDir, dataDir.settingsFile, models);
 		const projects = new Projects(dataDir);
+		// Runs code mode scripts in worker threads. Closing it mid-script is safe: Durable resumes the script next start.
+		const sandbox = new CodemodeSandbox({ memoryLimitBytes: CODEMODE_MEMORY_LIMIT_BYTES });
 		const hosts = new WorkspaceHosts({
 			dataDir,
 			models,
-			registry: createAgentRegistry(agentDir),
+			registry: createAgentRegistry(agentDir, sandbox),
 			defaults,
 			...(options.idleMs === undefined ? {} : { idleMs: options.idleMs }),
 		});
@@ -81,6 +87,7 @@ export async function startDaemon(options: DaemonOptions = {}): Promise<Daemon> 
 					server.closeAllConnections();
 					await new Promise<void>((resolve) => server.close(() => resolve()));
 					await hosts.closeAll();
+					await sandbox.close();
 					unlock();
 				})()),
 		};

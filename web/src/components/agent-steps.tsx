@@ -99,7 +99,10 @@ export function ToolStep({ call, result, slot, streaming }: ToolStepProps) {
 	);
 }
 
-/** What the title line does not show: an edit as removed and added lines, a write's content, other arguments. */
+/**
+ * What the title line does not show: an edit as removed and added lines, a write's content or a code mode script as
+ * code, other arguments as JSON.
+ */
 function ToolArguments({ call }: { call: ToolCall }) {
 	const args = call.arguments as Record<string, unknown>;
 	if (call.name === "edit") {
@@ -124,10 +127,11 @@ function ToolArguments({ call }: { call: ToolCall }) {
 			</CodeBlock>
 		);
 	}
-	if (call.name === "write" && typeof args.content === "string")
+	const code = call.name === "write" ? args.content : call.name === "codemode" ? args.code : undefined;
+	if (typeof code === "string")
 		return (
 			<CodeBlock size="sm">
-				<CodeBlockContent className="max-h-72">{args.content}</CodeBlockContent>
+				<CodeBlockContent className="max-h-72">{code}</CodeBlockContent>
 			</CodeBlock>
 		);
 	const { command: _command, path: _path, ...rest } = args;
@@ -143,6 +147,7 @@ function subject(call: ToolCall): string {
 	const args = call.arguments as Record<string, unknown>;
 	if (typeof args.command === "string") return args.command;
 	if (typeof args.path === "string") return args.path;
+	if (call.name === "tool_search" && typeof args.query === "string") return args.query;
 	return "";
 }
 

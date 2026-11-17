@@ -87,6 +87,31 @@ describe("daemon", () => {
 		}
 	});
 
+	it("runs a code mode script that calls another tool, and lists the tools in the prompt", async () => {
+		const code = 'const r = await tools.bash({ command: "echo from-script" });\nreturn r.output.trim();';
+		faux.setResponses([
+			fauxAssistantMessage(fauxToolCall("codemode", { code }), { stopReason: "toolUse" }),
+			fauxAssistantMessage("Scripted."),
+		]);
+		const client = await connect();
+		try {
+			client.send({ type: "watch", sub: "agent", workspace });
+			await client.until(() => client.view !== undefined);
+			await api("POST", `/api/workspaces/${workspace}/submit`, { content: "script it" });
+			await client.until(() => lastAssistantText(client.view) === "Scripted." && client.status === "idle", 30_000);
+			const results = client.view!.entries.filter((entry) => entry.kind === "pi.tool-result");
+			const result = results.at(-1)?.model?.[0];
+			assert.ok(result?.role === "toolResult" && !result.isError, `the script ran: ${JSON.stringify(result)}`);
+			assert.match(JSON.stringify(result.content), /Script completed[\s\S]*from-script/);
+			const system = JSON.stringify(client.view!.entries.filter((entry) => entry.kind === "pi.system"));
+			assert.match(system, /- codemode: Run JavaScript that calls other tools/);
+			assert.match(system, /- tool_search: Search for tools that are not loaded yet/);
+			assert.match(system, /Use codemode to batch independent tool calls/);
+		} finally {
+			client.close();
+		}
+	});
+
 	it("feeds a subscription from one watch when it is re-watched while setting up", async () => {
 		// React's StrictMode mounts twice: watch, unwatch and watch of one name arrive back to back.
 		faux.setResponses([fauxAssistantMessage("Only once.")]);
