@@ -15,6 +15,7 @@
 		"@earendil-works/pi-durable": "1.5.2",
 		"@flowie/daemon": "0.0.1",
 		"@fontsource-variable/geist": "5.3.0",
+		"@pierre/diffs": "1.6.4",
 		"@shadcn/react": "0.3.1",
 		"class-variance-authority": "0.7.1",
 		"cmdk": "1.1.1",

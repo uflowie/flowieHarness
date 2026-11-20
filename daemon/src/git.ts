@@ -16,19 +16,35 @@ export type Worktree = {
 
 export class GitError extends Error {
 	readonly stderr: string;
-	constructor(args: readonly string[], stderr: string) {
-		super(`git ${args.join(" ")}: ${stderr.trim() || "failed"}`);
+	/** Git wrote more than the call's `maxBuffer` and was stopped. */
+	readonly overflow: boolean;
+	constructor(args: readonly string[], stderr: string, overflow = false) {
+		super(`git ${args.join(" ")}: ${overflow ? "output too large" : stderr.trim() || "failed"}`);
 		this.stderr = stderr;
+		this.overflow = overflow;
 	}
 }
 
+export type GitOptions = {
+	/** Replaces the environment (default: the daemon's). */
+	readonly env?: NodeJS.ProcessEnv;
+	/** Bytes of stdout beyond which git is stopped and the call fails (default 16 MiB). */
+	readonly maxBuffer?: number;
+};
+
 /** Runs git in `cwd` and resolves with its stdout. */
-export function git(args: readonly string[], cwd: string): Promise<string> {
+export function git(args: readonly string[], cwd: string, options: GitOptions = {}): Promise<string> {
 	return new Promise((resolvePromise, reject) => {
-		execFile("git", args, { cwd, maxBuffer: 16 * 1024 * 1024, windowsHide: true }, (error, stdout, stderr) => {
-			if (error) reject(new GitError(args, stderr || error.message));
-			else resolvePromise(stdout);
-		});
+		execFile(
+			"git",
+			args,
+			{ cwd, env: options.env, maxBuffer: options.maxBuffer ?? 16 * 1024 * 1024, windowsHide: true },
+			(error, stdout, stderr) => {
+				const overflow = (error as { code?: unknown } | null)?.code === "ERR_CHILD_PROCESS_STDIO_MAXBUFFER";
+				if (error) reject(new GitError(args, stderr || error.message, overflow));
+				else resolvePromise(stdout);
+			},
+		);
 	});
 }
 

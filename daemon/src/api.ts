@@ -14,6 +14,7 @@ import {
 } from "@earendil-works/pi-durable";
 import type { Validator } from "@earendil-works/pi-schema";
 import type { Access } from "./access.ts";
+import { diffBase, diffContents, worktreeDiff } from "./diff.ts";
 import { GitError } from "./git.ts";
 import type { AgentDefaults } from "./models.ts";
 import { listDirectory } from "./directories.ts";
@@ -25,6 +26,7 @@ import {
 	Compact,
 	Configure,
 	CreateWorktree,
+	type DiffContents,
 	type DirectoryListing,
 	type ModelListing,
 	type GlobalInstructions,
@@ -33,6 +35,7 @@ import {
 	SaveInstructions,
 	Submit,
 	type WorkspaceDetail,
+	type WorkspaceDiff,
 	type WorkspaceListing,
 } from "./protocol.ts";
 import { message, type OpenWorkspace, type WorkspaceHosts } from "./workspaces.ts";
@@ -288,6 +291,29 @@ function apiRoutes({ projects, hosts, models, defaults, agentDir }: ApiDeps): Ro
 				const image = await worktreeImage((await workspaceOf(id!)).path, path);
 				if (!(image instanceof FileResponse)) throw new HttpError(image.status, image.message);
 				return image;
+			},
+		},
+		{
+			// The worktree's changes for review.
+			method: "GET",
+			pattern: /^\/api\/workspaces\/([^/]+)\/diff$/,
+			handle: async ({ params: [id] }): Promise<WorkspaceDiff> => {
+				const workspace = await workspaceOf(id!);
+				const main = (await projects.workspaces(projectOf(workspace.projectId))).find((each) => each.main);
+				const base = await diffBase(workspace, main);
+				return { base, files: await worktreeDiff(workspace.path, base.commit) };
+			},
+		},
+		{
+			// Both versions of a changed file, for expanding a diff's unchanged lines.
+			method: "GET",
+			pattern: /^\/api\/workspaces\/([^/]+)\/diff\/contents$/,
+			handle: async ({ url, params: [id] }): Promise<DiffContents> => {
+				const base = url.searchParams.get("base");
+				const path = url.searchParams.get("path");
+				if (!base || !path) throw new HttpError(400, "base and path are required");
+				const oldPath = url.searchParams.get("oldPath") ?? undefined;
+				return diffContents((await workspaceOf(id!)).path, base, path, oldPath);
 			},
 		},
 		{

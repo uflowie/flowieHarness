@@ -82,6 +82,34 @@ export type GlobalInstructions = {
 /** `PUT /api/instructions`. */
 export const SaveInstructions = compile(obj({ content: str() }));
 
+/**
+ * `GET /api/workspaces/:id/diff`: the worktree's changes for review, as files on disk now (untracked ones included)
+ * against the commit the worktree started from.
+ */
+export type WorkspaceDiff = {
+	/** The merge base with the main checkout's branch; on the main checkout, HEAD (its uncommitted changes). */
+	readonly base: { readonly commit: string; readonly label: string };
+	readonly files: readonly DiffFile[];
+};
+
+export type DiffFile = {
+	readonly path: string;
+	/** The path in the base, when git found the file renamed or copied. */
+	readonly oldPath?: string;
+	readonly status: "added" | "deleted" | "modified" | "renamed";
+	/** Git's unified diff of the file, headers included. Only the headers when `binary` or `omitted`. */
+	readonly patch: string;
+	readonly binary: boolean;
+	/** The diff was too large to send: its size in bytes. */
+	readonly omitted?: number;
+};
+
+/**
+ * `GET /api/workspaces/:id/diff/contents?base=&path=&oldPath=`: both versions of a changed file, to expand a diff's
+ * unchanged lines. `null` for a side the file does not exist on.
+ */
+export type DiffContents = { readonly oldFile: string | null; readonly newFile: string | null };
+
 const Text = obj({ type: lit("text"), text: str() });
 const Image = obj({ type: lit("image"), data: str({ minLength: 1 }), mimeType: str({ minLength: 1 }) });
 

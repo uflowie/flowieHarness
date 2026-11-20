@@ -1,7 +1,10 @@
-// One workspace (worktree): a header with where it is and what its agent is doing, and tabs for its views.
+// One workspace (worktree): a header with where it is and what its agent is doing, and tabs for its views. Every view
+// opened stays mounted, hidden by visibility like the workspaces themselves (see App), so switching tabs keeps the
+// chat's scroll position.
 import type { UsageState } from "@earendil-works/pi-durable";
 import type { WorkspaceListing, WorkspaceStatus } from "@flowie/daemon/protocol";
 import { EllipsisVerticalIcon, ListRestartIcon, ShrinkIcon } from "lucide-react";
+import { lazy, type ReactNode, Suspense, useState } from "react";
 import { toast } from "sonner";
 import { Chat } from "@/components/chat";
 import { useConfirm } from "@/components/confirm";
@@ -17,15 +20,34 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Spinner } from "@/components/ui/spinner";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useConversation } from "@/hooks/use-conversation";
 import { api } from "@/lib/api";
+import { cn } from "@/lib/utils";
 
-type Props = { readonly workspace: WorkspaceListing; readonly projectName: string; readonly status: WorkspaceStatus };
+type Props = {
+	readonly workspace: WorkspaceListing;
+	readonly projectName: string;
+	readonly status: WorkspaceStatus;
+	/** The selected workspace, the one on screen. */
+	readonly active: boolean;
+};
 
-export function Workspace({ workspace, projectName, status }: Props) {
+type Tab = "chat" | "changes";
+
+// The diff viewer and its highlighter load with the first Changes tab opened.
+const Changes = lazy(() => import("@/components/changes").then((module) => ({ default: module.Changes })));
+
+export function Workspace({ workspace, projectName, status, active }: Props) {
 	const conversation = useConversation(workspace.id);
+	const [tab, setTab] = useState<Tab>("chat");
+	// The Changes view mounts the first time it is shown.
+	const [opened, setOpened] = useState<ReadonlySet<Tab>>(new Set(["chat"]));
+	const show = (next: Tab) => {
+		setTab(next);
+		if (!opened.has(next)) setOpened(new Set([...opened, next]));
+	};
 	const confirm = useConfirm();
 	const fail = (error: unknown) => toast.error(error instanceof Error ? error.message : String(error));
 
@@ -77,16 +99,40 @@ export function Workspace({ workspace, projectName, status }: Props) {
 					</DropdownMenu>
 				</div>
 			</header>
-			<Tabs defaultValue="chat" className="flex min-h-0 flex-1 flex-col gap-0">
+			<Tabs
+				value={tab}
+				onValueChange={(value: Tab) => show(value)}
+				className="flex min-h-0 flex-1 flex-col gap-0"
+			>
 				<div className="border-b px-3">
 					<TabsList variant="line">
 						<TabsTrigger value="chat">Chat</TabsTrigger>
+						<TabsTrigger value="changes">Changes</TabsTrigger>
 					</TabsList>
 				</div>
-				<TabsContent value="chat" className="flex min-h-0 flex-1 flex-col">
-					<Chat workspace={workspace.id} conversation={conversation} />
-				</TabsContent>
+				{/* Every opened view in the same grid cell; only the current one is visible. */}
+				<div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)] grid-rows-[minmax(0,1fr)] *:col-start-1 *:row-start-1">
+					<TabView shown={tab === "chat"}>
+						<Chat workspace={workspace.id} conversation={conversation} />
+					</TabView>
+					{opened.has("changes") && (
+						<TabView shown={tab === "changes"}>
+							<Suspense fallback={<Spinner className="m-auto" />}>
+								<Changes workspace={workspace.id} visible={active && tab === "changes"} onSent={() => show("chat")} />
+							</Suspense>
+						</TabView>
+					)}
+				</div>
 			</Tabs>
+		</div>
+	);
+}
+
+function TabView({ shown, children }: { shown: boolean; children: ReactNode }) {
+	return (
+		// Transitions off while hidden, as for hidden workspaces.
+		<div className={cn("flex min-h-0 flex-col", !shown && "invisible **:transition-none")} inert={!shown}>
+			{children}
 		</div>
 	);
 }

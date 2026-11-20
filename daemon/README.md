@@ -52,6 +52,8 @@ JSON in and out; errors are `{ "error": "..." }` with 400 (invalid input, git re
 | `POST /api/workspaces/:id/compact` | `{ instructions? }` | Summarize older context |
 | `POST /api/workspaces/:id/reset` | `{ handoff? }` | Start a fresh context (history stays) |
 | `GET /api/workspaces/:id/file?path=` | | An image file of the worktree (path relative to it, or absolute inside it), for Markdown images the agent writes |
+| `GET /api/workspaces/:id/diff` | | The worktree's changes for review: the files on disk, untracked ones included, against the merge base with the main checkout's branch (the main checkout: against HEAD), each with git's patch |
+| `GET /api/workspaces/:id/diff/contents?base=&path=&oldPath=` | | Both versions of a changed file (`null` for a side it does not exist on), for expanding unchanged lines |
 | `GET /api/workspaces/:id/entries?min=&max=&order=&limit=&cursor=&conversation=` | | History between entry IDs `min` and `max` (inclusive), newest first unless `order=ascending` |
 
 ## WebSocket `/api/ws`

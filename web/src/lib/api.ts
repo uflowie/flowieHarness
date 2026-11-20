@@ -2,11 +2,13 @@
 import type { ModelThinkingLevel } from "@earendil-works/pi-ai";
 import type { EntryRecord, ModelRef } from "@earendil-works/pi-durable";
 import type {
+	DiffContents,
 	DirectoryListing,
 	GlobalInstructions,
 	ModelListing,
 	ProjectListing,
 	Submit,
+	WorkspaceDiff,
 	WorkspaceListing,
 } from "@flowie/daemon/protocol";
 
@@ -58,6 +60,13 @@ export const api = {
 	abort: (id: string) => call<unknown>("POST", workspacePath(id, "/abort")),
 	compact: (id: string) => call<unknown>("POST", workspacePath(id, "/compact"), {}),
 	reset: (id: string) => call<unknown>("POST", workspacePath(id, "/reset"), {}),
+	/** The worktree's changes against where it started. */
+	diff: (id: string) => call<WorkspaceDiff>("GET", workspacePath(id, "/diff")),
+	diffContents: (id: string, base: string, path: string, oldPath: string | undefined) => {
+		const params = new URLSearchParams({ base, path });
+		if (oldPath !== undefined) params.set("oldPath", oldPath);
+		return call<DiffContents>("GET", workspacePath(id, `/diff/contents?${params}`));
+	},
 	entries: (id: string, query: EntryQuery) => {
 		const params = new URLSearchParams({ limit: String(query.limit) });
 		for (const key of ["min", "max", "order", "conversation"] as const)

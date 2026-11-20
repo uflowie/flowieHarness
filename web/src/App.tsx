@@ -76,6 +76,7 @@ export function App() {
 									workspace={each.workspace}
 									projectName={each.project.name}
 									status={statuses[id] ?? each.workspace.status}
+									active={active}
 								/>
 							</div>
 						)
